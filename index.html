@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>myBlog - Broadcast Your Thoughts</title>
+    <title>myBlog </title>
     <style>
         body {
             background-color: #FFFFFF;
@@ -86,12 +86,6 @@
         .box-content {
             padding: 10px;
         }
-        .yellow-box {
-            border: 1px solid #E6DB55;
-            background-color: #FFF9CC;
-            padding: 8px;
-            margin-bottom: 15px;
-        }
         .post-title {
             font-size: 18px;
             color: #0033CC;
@@ -123,16 +117,12 @@
         <div id="header-bar">
             <div id="logo"><a href="index.html" style="color:black;">my<span>Blog</span></a></div>
             <div>
-                <input type="text" class="search-box" value="Search blog posts...">
-                <button class="button-retro">Search</button>
+                <input type="text" id="search-input" class="search-box" placeholder="Search blog posts...">
+                <button class="button-retro" onclick="executeSearch()">Search</button>
             </div>
             <div>
                 <button class="button-retro" onclick="checkAdminAccess()" style="background-color: #FFF9CC; border-color: #E6DB55;">Admin CP</button>
             </div>
-        </div>
-
-        <div class="yellow-box">
-            <strong>System Notice:</strong> Welcome to the network. Broadcast your thoughts!
         </div>
 
         <div class="main-layout" id="main-content-wrapper" style="display: none;">
@@ -158,14 +148,14 @@
                 <div class="box">
                     <div class="box-header">More Bulletins</div>
                     <div class="box-content" id="sidebar-list" style="padding: 5px;">
-                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="empty-state" class="box" style="padding: 40px; text-align: center;">
-            <h2 style="color: #666;">No Blogs Posted Yet!</h2>
-            <p style="color: #888;">The database is completely clear.</p>
+            <h2 id="empty-title" style="color: #666;">No Blogs Posted Yet!</h2>
+            <p id="empty-desc" style="color: #888;">The database is completely clear.</p>
         </div>
     </div>
 
@@ -175,10 +165,10 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let blogPosts = [];
+        let filteredPosts = []; // For holding our filtered search data matrix
         const urlParams = new URLSearchParams(window.location.search);
         let activeId = urlParams.get('id'); 
 
-        // 🔒 INSTANT PASSWORD PORTAL ACTION
         function checkAdminAccess() {
             const passwordAttempt = prompt("Enter Administration Password to open Terminal:");
             if (passwordAttempt === "sUyxnIB6qRr7aG1N") {
@@ -192,24 +182,62 @@
             let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
             if (error) console.error(error);
             blogPosts = data || [];
+            filteredPosts = blogPosts; // Default state shows everything
             
-            if (!activeId && blogPosts.length > 0) {
-                activeId = blogPosts[0].id.toString();
+            if (!activeId && filteredPosts.length > 0) {
+                activeId = filteredPosts[0].id.toString();
             }
             renderPage();
         }
 
+        // FIXED: Live database search routing mechanism
+        function executeSearch() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            
+            if (query === "") {
+                filteredPosts = blogPosts; // Reset back to full list if empty query
+            } else {
+                filteredPosts = blogPosts.filter(post => 
+                    post.title.toLowerCase().includes(query) || 
+                    post.content.toLowerCase().includes(query)
+                );
+            }
+
+            // Adjust the reading view fallback to match the matching search results list
+            if (filteredPosts.length > 0) {
+                activeId = filteredPosts[0].id.toString();
+            }
+            
+            renderPage();
+        }
+
+        // Allow pressing 'Enter' inside search bar to trigger search instantly
+        document.getElementById('search-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                executeSearch();
+            }
+        });
+
         async function renderPage() {
-            if (blogPosts.length === 0) {
+            if (filteredPosts.length === 0) {
                 document.getElementById('empty-state').style.display = 'block';
                 document.getElementById('main-content-wrapper').style.display = 'none';
+                
+                // Show custom messaging if search query came up dry
+                if (document.getElementById('search-input').value.trim() !== "") {
+                    document.getElementById('empty-title').innerText = "No Search Results Found!";
+                    document.getElementById('empty-desc').innerText = "Try searching for a different keyword.";
+                } else {
+                    document.getElementById('empty-title').innerText = "No Blogs Posted Yet!";
+                    document.getElementById('empty-desc').innerText = "The database is completely clear.";
+                }
                 return;
             }
 
             document.getElementById('empty-state').style.display = 'none';
             document.getElementById('main-content-wrapper').style.display = 'grid';
 
-            let currentPost = blogPosts.find(p => p.id.toString() === activeId.toString()) || blogPosts[0];
+            let currentPost = filteredPosts.find(p => p.id.toString() === activeId.toString()) || filteredPosts[0];
             
             if (!sessionStorage.getItem(`viewed-${currentPost.id}`)) {
                 currentPost.views += 1;
@@ -229,7 +257,7 @@
 
             const sidebar = document.getElementById('sidebar-list');
             sidebar.innerHTML = '';
-            blogPosts.forEach(post => {
+            filteredPosts.forEach(post => {
                 let sideStars = '★'.repeat(post.stars);
                 const item = document.createElement('div');
                 item.style.cssText = "display: flex; margin-bottom: 10px; border-bottom: 1px solid #EEE; padding-bottom: 5px;";
@@ -238,13 +266,19 @@
                         BLOG
                     </div>
                     <div>
-                        <a href="index.html?id=${post.id}" style="font-weight: ${post.id.toString() === currentPost.id.toString() ? 'bold' : 'normal'}; font-size: 12px; display: block;">${escapeHTML(post.title)}</a>
+                        <a href="#" onclick="changeActivePost('${post.id}'); return false;" style="font-weight: ${post.id.toString() === currentPost.id.toString() ? 'bold' : 'normal'}; font-size: 12px; display: block;">${escapeHTML(post.title)}</a>
                         <span style="font-size: 11px; color: #666;">Views: ${post.views}</span><br>
                         <span class="stars" style="font-size:11px;">${sideStars}</span>
                     </div>
                 `;
                 sidebar.appendChild(item);
             });
+        }
+
+        // Seamless local switching logic that doesn't clear searches when changing entries
+        window.changeActivePost = function(id) {
+            activeId = id;
+            renderPage();
         }
 
         function escapeHTML(str) {
