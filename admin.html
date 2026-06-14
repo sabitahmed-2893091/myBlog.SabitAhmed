@@ -49,6 +49,12 @@
             font-size: 12px;
             font-weight: bold;
             cursor: pointer;
+            margin-left: 4px;
+        }
+        .button-retro:active {
+            border: 1px solid #999999;
+            border-top: 2px solid #666666;
+            border-left: 2px solid #666666;
         }
         .container {
             max-width: 950px;
@@ -105,7 +111,7 @@
 
         <div class="main-layout">
             <div class="box">
-                <div class="box-header">Upload / Create New Blog Post</div>
+                <div class="box-header" id="form-panel-title">Upload / Create New Blog Post</div>
                 <div class="box-content">
                     <form id="post-form">
                         <div class="form-group">
@@ -126,7 +132,8 @@
                                 <option value="1">1 Star (Lame)</option>
                             </select>
                         </div>
-                        <button type="submit" class="button-retro" style="font-size:13px; padding: 5px 15px;">Publish Bulletin</button>
+                        <button type="submit" id="submit-btn" class="button-retro" style="font-size:13px; padding: 5px 15px;">Publish Bulletin</button>
+                        <button type="button" id="cancel-edit-btn" class="button-retro" style="font-size:13px; padding: 5px 15px; display: none; color: #555;" onclick="clearEditMode()">Cancel Edit</button>
                     </form>
                 </div>
             </div>
@@ -134,7 +141,7 @@
             <div class="box">
                 <div class="box-header">Manage Active Bulletins</div>
                 <div class="box-content" id="admin-queue">
-                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -152,6 +159,7 @@
         }
 
         let blogPosts = [];
+        let editingPostId = null; // Tracks if we are editing an entry
 
         async function fetchQueue() {
             let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
@@ -173,49 +181,101 @@
                 const row = document.createElement('div');
                 row.style.cssText = "border-bottom: 1px dashed #CCC; padding: 6px 0; display: flex; justify-content: space-between; align-items: center;";
                 row.innerHTML = `
-                    <div>
+                    <div style="max-width: 65%;">
                         <strong style="color:#0033CC;">${escapeHTML(post.title)}</strong><br>
                         <span style="font-size:11px; color:#666;">Date: ${post.date}</span>
                     </div>
                     <div>
-                        <button class="button-retro" style="color:red; font-weight:normal;" onclick="deletePost(${post.id})">Delete</button>
+                        <button class="button-retro" style="color:blue;" onclick="startEditPost(${post.id})">Edit</button>
+                        <button class="button-retro" style="color:red;" onclick="deletePost(${post.id})">Delete</button>
                     </div>
                 `;
                 queueContainer.appendChild(row);
             });
         }
 
+        // FIXED: Pulls specific data row up into input fields to begin mutation tracking
+        window.startEditPost = function(id) {
+            const targetPost = blogPosts.find(p => p.id === id);
+            if (!targetPost) return;
+
+            editingPostId = id;
+            
+            // Populate data back into input matrix components
+            document.getElementById('post-title').value = targetPost.title;
+            document.getElementById('post-content').value = targetPost.content;
+            document.getElementById('post-stars').value = targetPost.stars;
+
+            // Change form visual layouts to state editing system context
+            document.getElementById('form-panel-title').innerText = "⚠️ Editing Blog Entry: " + targetPost.title;
+            document.getElementById('submit-btn').innerText = "Save Changes";
+            document.getElementById('cancel-edit-btn').style.display = "inline-block";
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // FIXED: Safely exits out of editing status and clears inputs
+        window.clearEditMode = function() {
+            editingPostId = null;
+            document.getElementById('post-form').reset();
+            document.getElementById('form-panel-title').innerText = "Upload / Create New Blog Post";
+            document.getElementById('submit-btn').innerText = "Publish Bulletin";
+            document.getElementById('cancel-edit-btn').style.display = "none";
+        }
+
+        // Form Submit Handler
         document.getElementById('post-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const title = document.getElementById('post-title').value;
             const content = document.getElementById('post-content').value;
             const stars = parseInt(document.getElementById('post-stars').value);
-            
-            const options = { year: 'numeric', month: 'long', day: 'numeric' };
-            const formattedDate = new Date().toLocaleDateString('en-US', options);
 
-            const { error } = await _supabase.from('posts').insert([
-                {
-                    title: title,
-                    content: content,
-                    stars: stars,
-                    date: formattedDate,
-                    views: 0
+            if (editingPostId !== null) {
+                // FIXED: Executes an UPDATE command inside database matrix instead of creating raw entries
+                const { error } = await _supabase
+                    .from('posts')
+                    .update({ title: title, content: content, stars: stars })
+                    .eq('id', editingPostId);
+
+                if (error) {
+                    alert('Update Error: ' + error.message);
+                } else {
+                    alert('Changes saved successfully!');
+                    clearEditMode();
+                    fetchQueue();
                 }
-            ]);
-
-            if (error) {
-                alert('Database Error: ' + error.message);
             } else {
-                document.getElementById('post-form').reset();
-                alert('Your masterpiece has been updated successfully!');
-                fetchQueue();
+                // Creates standard clean brand new post entry
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                const formattedDate = new Date().toLocaleDateString('en-US', options);
+
+                const { error } = await _supabase.from('posts').insert([
+                    {
+                        title: title,
+                        content: content,
+                        stars: stars,
+                        date: formattedDate,
+                        views: 0
+                    }
+                ]);
+
+                if (error) {
+                    alert('Database Error: ' + error.message);
+                } else {
+                    document.getElementById('post-form').reset();
+                    alert('Your masterpiece has been updated successfully!');
+                    fetchQueue();
+                }
             }
         });
 
+        // Delete Handler
         window.deletePost = async function(id) {
             if (confirm("Are you sure you want to remove this bulletin from history?")) {
+                // If we're currently editing the post being deleted, cancel edit mode
+                if (editingPostId === id) clearEditMode();
+                
                 const { error } = await _supabase.from('posts').delete().eq('id', id);
                 if (error) console.error(error);
                 fetchQueue();
