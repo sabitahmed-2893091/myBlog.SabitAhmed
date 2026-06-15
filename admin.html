@@ -120,7 +120,11 @@
                         </div>
                         <div class="form-group">
                             <label>Blog Content / Description Box:</label>
-                            <textarea id="post-content" rows="8" class="form-textarea" required placeholder="Type your updates here... style it like it's 2006!"></textarea>
+                            <textarea id="post-content" rows="8" class="form-textarea" required placeholder="Type your updates here..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Thumbnail Image URL:</label>
+                            <input type="url" id="post-image" class="form-input" placeholder="e.g., https://example.com/image.jpg (Leave empty for default)">
                         </div>
                         <div class="form-group">
                             <label>Star Rating Selection Asset:</label>
@@ -151,7 +155,6 @@
         const SUPABASE_ANON_KEY = "sb_publishable_jv_RDsZY8--iwjAIFsAqDw_wHGX_RQx";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 🔒 SECURITY GATEWAY
         const accessKey = prompt("Enter Administration Password:");
         if (accessKey !== "sUyxnIB6qRr7aG1N") {
             alert("Access Denied: Terminal Lock Active.");
@@ -159,7 +162,7 @@
         }
 
         let blogPosts = [];
-        let editingPostId = null; // Tracks if we are editing an entry
+        let editingPostId = null;
 
         async function fetchQueue() {
             let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
@@ -194,19 +197,17 @@
             });
         }
 
-        // FIXED: Pulls specific data row up into input fields to begin mutation tracking
         window.startEditPost = function(id) {
             const targetPost = blogPosts.find(p => p.id === id);
             if (!targetPost) return;
 
             editingPostId = id;
             
-            // Populate data back into input matrix components
             document.getElementById('post-title').value = targetPost.title;
             document.getElementById('post-content').value = targetPost.content;
+            document.getElementById('post-image').value = targetPost.image || '';
             document.getElementById('post-stars').value = targetPost.stars;
 
-            // Change form visual layouts to state editing system context
             document.getElementById('form-panel-title').innerText = "⚠️ Editing Blog Entry: " + targetPost.title;
             document.getElementById('submit-btn').innerText = "Save Changes";
             document.getElementById('cancel-edit-btn').style.display = "inline-block";
@@ -214,7 +215,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // FIXED: Safely exits out of editing status and clears inputs
         window.clearEditMode = function() {
             editingPostId = null;
             document.getElementById('post-form').reset();
@@ -223,19 +223,18 @@
             document.getElementById('cancel-edit-btn').style.display = "none";
         }
 
-        // Form Submit Handler
         document.getElementById('post-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const title = document.getElementById('post-title').value;
             const content = document.getElementById('post-content').value;
+            const image = document.getElementById('post-image').value.trim();
             const stars = parseInt(document.getElementById('post-stars').value);
 
             if (editingPostId !== null) {
-                // FIXED: Executes an UPDATE command inside database matrix instead of creating raw entries
                 const { error } = await _supabase
                     .from('posts')
-                    .update({ title: title, content: content, stars: stars })
+                    .update({ title: title, content: content, image: image, stars: stars })
                     .eq('id', editingPostId);
 
                 if (error) {
@@ -246,7 +245,6 @@
                     fetchQueue();
                 }
             } else {
-                // Creates standard clean brand new post entry
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
                 const formattedDate = new Date().toLocaleDateString('en-US', options);
 
@@ -254,6 +252,7 @@
                     {
                         title: title,
                         content: content,
+                        image: image || null,
                         stars: stars,
                         date: formattedDate,
                         views: 0
@@ -270,12 +269,9 @@
             }
         });
 
-        // Delete Handler
         window.deletePost = async function(id) {
             if (confirm("Are you sure you want to remove this bulletin from history?")) {
-                // If we're currently editing the post being deleted, cancel edit mode
                 if (editingPostId === id) clearEditMode();
-                
                 const { error } = await _supabase.from('posts').delete().eq('id', id);
                 if (error) console.error(error);
                 fetchQueue();
