@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>myBlog - Admin Dashboard</title>
+    <title>myBlog - Secure Admin Dashboard</title>
     <style>
         body {
             background-color: #FFFFFF;
@@ -94,57 +94,81 @@
             padding: 4px;
             box-sizing: border-box;
         }
+        #login-overlay {
+            max-width: 400px;
+            margin: 100px auto;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="container">
-        <div id="header-bar">
-            <div id="logo">
-                <a href="index.html" style="color:black;">my<span>Blog</span></a> 
-                <span style="font-size:14px; color:#666; font-weight:normal;">[Admin Control Panel]</span>
-            </div>
-            <div>
-                <a href="index.html" class="button-retro" style="text-decoration:none; color:black;">← Back to Main Site</a>
+        
+        <div id="login-overlay" class="box" style="display: none;">
+            <div class="box-header">🔒 Identity Gateway Authentication</div>
+            <div class="box-content">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>SysOp Email:</label>
+                        <input type="email" id="login-email" class="form-input" required placeholder="admin@myblog.co">
+                    </div>
+                    <div class="form-group">
+                        <label>Security Keyphrase / Password:</label>
+                        <input type="password" id="login-password" class="form-input" required>
+                    </div>
+                    <button type="submit" class="button-retro" style="width: 100%; padding: 6px;">Decrypt & Log In</button>
+                </form>
             </div>
         </div>
 
-        <div class="main-layout">
-            <div class="box">
-                <div class="box-header" id="form-panel-title">Upload / Create New Blog Post</div>
-                <div class="box-content">
-                    <form id="post-form">
-                        <div class="form-group">
-                            <label>Post Title:</label>
-                            <input type="text" id="post-title" class="form-input" required placeholder="e.g., My crazy weekend coding session">
-                        </div>
-                        <div class="form-group">
-                            <label>Blog Content / Description Box:</label>
-                            <textarea id="post-content" rows="8" class="form-textarea" required placeholder="Type your updates here..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Thumbnail Image URL:</label>
-                            <input type="url" id="post-image" class="form-input" placeholder="e.g., https://example.com/image.jpg (Leave empty for default)">
-                        </div>
-                        <div class="form-group">
-                            <label>Star Rating Selection Asset:</label>
-                            <select id="post-stars" class="form-input" style="width: auto;">
-                                <option value="5">5 Stars (Awesome)</option>
-                                <option value="4">4 Stars</option>
-                                <option value="3">3 Stars</option>
-                                <option value="2">2 Stars</option>
-                                <option value="1">1 Star (Lame)</option>
-                            </select>
-                        </div>
-                        <button type="submit" id="submit-btn" class="button-retro" style="font-size:13px; padding: 5px 15px;">Publish Bulletin</button>
-                        <button type="button" id="cancel-edit-btn" class="button-retro" style="font-size:13px; padding: 5px 15px; display: none; color: #555;" onclick="clearEditMode()">Cancel Edit</button>
-                    </form>
+        <div id="admin-interface" style="display: none;">
+            <div id="header-bar">
+                <div id="logo">
+                    <a href="index.html" style="color:black;">my<span>Blog</span></a> 
+                    <span style="font-size:14px; color:#666; font-weight:normal;">[Authenticated Session]</span>
+                </div>
+                <div>
+                    <button class="button-retro" onclick="handleLogout()" style="color: darkred;">Log Out Terminal ✖</button>
+                    <a href="index.html" class="button-retro" style="text-decoration:none; color:black;">← Main Site</a>
                 </div>
             </div>
 
-            <div class="box">
-                <div class="box-header">Manage Active Bulletins</div>
-                <div class="box-content" id="admin-queue">
+            <div class="main-layout">
+                <div class="box">
+                    <div class="box-header" id="form-panel-title">Upload / Create New Blog Post</div>
+                    <div class="box-content">
+                        <form id="post-form">
+                            <div class="form-group">
+                                <label>Post Title:</label>
+                                <input type="text" id="post-title" class="form-input" required placeholder="e.g., Implementing token auth matrix...">
+                            </div>
+                            <div class="form-group">
+                                <label>Blog Content / Description Box:</label>
+                                <textarea id="post-content" rows="8" class="form-textarea" required placeholder="Type updates here..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Thumbnail Image URL:</label>
+                                <input type="url" id="post-image" class="form-input" placeholder="https://example.com/image.jpg">
+                            </div>
+                            <div class="form-group">
+                                <label>Star Rating Selection Asset:</label>
+                                <select id="post-stars" class="form-input" style="width: auto;">
+                                    <option value="5">5 Stars (Awesome)</option>
+                                    <option value="4">4 Stars</option>
+                                    <option value="3">3 Stars</option>
+                                    <option value="2">2 Stars</option>
+                                    <option value="1">1 Star (Lame)</option>
+                                </select>
+                            </div>
+                            <button type="submit" id="submit-btn" class="button-retro" style="font-size:13px; padding: 5px 15px;">Publish Bulletin</button>
+                            <button type="button" id="cancel-edit-btn" class="button-retro" style="font-size:13px; padding: 5px 15px; display: none; color: #555;" onclick="clearEditMode()">Cancel Edit</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="box">
+                    <div class="box-header">Manage Active Bulletins</div>
+                    <div class="box-content" id="admin-queue"></div>
                 </div>
             </div>
         </div>
@@ -155,14 +179,38 @@
         const SUPABASE_ANON_KEY = "sb_publishable_jv_RDsZY8--iwjAIFsAqDw_wHGX_RQx";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const accessKey = prompt("Enter Administration Password:");
-        if (accessKey !== "sUyxnIB6qRr7aG1N") {
-            alert("Access Denied: Terminal Lock Active.");
-            window.location.href = "index.html"; 
-        }
-
         let blogPosts = [];
         let editingPostId = null;
+
+        // 🔒 AUTHENTICATION LISTENERS: Monitor live session status
+        _supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('admin-interface').style.display = 'block';
+                fetchQueue();
+            } else {
+                document.getElementById('login-overlay').style.display = 'block';
+                document.getElementById('admin-interface').style.display = 'none';
+            }
+        });
+
+        // Login Handler
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            const { error } = await _supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                alert("ACCESS DENIED: " + error.message);
+            }
+        });
+
+        // Logout Handler
+        async function handleLogout() {
+            await _supabase.auth.signOut();
+            alert("Terminal Disconnected safely.");
+        }
 
         async function fetchQueue() {
             let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
@@ -281,8 +329,6 @@
         function escapeHTML(str) {
             return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         }
-
-        fetchQueue();
     </script>
 </body>
 </html>
