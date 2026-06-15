@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>myBlog </title>
+    <title>myBlog</title>
     
     <link rel="icon" type="image/png" href="logo.png">
 
@@ -131,7 +131,7 @@
                 <button class="button-retro" onclick="executeSearch()">Search</button>
             </div>
             <div>
-                <button class="button-retro" onclick="checkAdminAccess()" style="background-color: #FFF9CC; border-color: #E6DB55;">Admin CP</button>
+                <a href="admin.html" class="button-retro" style="background-color: #FFF9CC; border-color: #E6DB55; text-decoration: none; padding: 4px 10px;">Admin CP</a>
             </div>
         </div>
 
@@ -183,15 +183,6 @@
         let filteredPosts = [];
         const urlParams = new URLSearchParams(window.location.search);
         let activeId = urlParams.get('id'); 
-
-        function checkAdminAccess() {
-            const passwordAttempt = prompt("Enter Administration Password to open Terminal:");
-            if (passwordAttempt === "sUyxnIB6qRr7aG1N") {
-                window.location.href = "admin.html";
-            } else {
-                alert("Access Denied: Terminal Gateway Locked.");
-            }
-        }
 
         async function fetchPosts() {
             let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
