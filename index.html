@@ -120,4 +120,210 @@
             margin-right: 8px;
         }
     </style>
-    <script src="https://cdn.jsdelivr
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="header-bar">
+            <div id="logo"><a href="index.html" style="color:black;">my<span>Blog</span></a></div>
+            <div>
+                <input type="text" id="search-input" class="search-box" placeholder="Search blog posts...">
+                <button class="button-retro" onclick="executeSearch()">Search</button>
+            </div>
+            <div>
+                <a href="admin.html" class="button-retro" style="background-color: #FFF9CC; border-color: #E6DB55; text-decoration: none; padding: 4px 10px;">Admin</a>
+            </div>
+        </div>
+
+        <div class="main-layout" id="main-content-wrapper" style="display: none;">
+            <div>
+                <div class="box">
+                    <div class="box-header">
+                        <span>Now Reading</span>
+                        <span>From: Admin</span>
+                    </div>
+                    <div class="box-content">
+                        <div style="display: flex; gap: 15px; flex-direction: column;">
+                            <img id="active-image" style="width: 100%; max-height: 250px; object-fit: cover; border: 1px solid #DDD; display: none; margin-bottom: 10px;">
+                            <div>
+                                <div class="post-title" id="active-title"></div>
+                                <div class="post-meta" id="active-meta"></div>
+                                <div class="post-body" id="active-body"></div>
+                                <div>
+                                    <span style="font-weight:bold;">Rating:</span> 
+                                    <span class="stars" id="active-stars"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="box">
+                    <div class="box-header">More Bulletins</div>
+                    <div class="box-content" id="sidebar-list" style="padding: 5px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="empty-state" class="box" style="padding: 40px; text-align: center;">
+            <h2 id="empty-title" style="color: #666;">No Blogs Posted Yet!</h2>
+            <p id="empty-desc" style="color: #888;">The database is completely clear.</p>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://npgslvyukrbnugxkdisp.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_jv_RDsZY8--iwjAIFsAqDw_wHGX_RQx";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let blogPosts = [];
+        let filteredPosts = [];
+        let activeId = null;
+
+        // Reads coordinates initially from the URL parameter stack
+        function initActiveId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            activeId = urlParams.get('id');
+        }
+
+        async function fetchPosts() {
+            initActiveId();
+            let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
+            if (error) console.error(error);
+            blogPosts = data || [];
+            filteredPosts = blogPosts;
+            
+            if (!activeId && filteredPosts.length > 0) {
+                activeId = filteredPosts[0].id.toString();
+            }
+            renderPage();
+        }
+
+        function executeSearch() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            
+            if (query === "") {
+                filteredPosts = blogPosts;
+            } else {
+                filteredPosts = blogPosts.filter(post => 
+                    post.title.toLowerCase().includes(query) || 
+                    post.content.toLowerCase().includes(query)
+                );
+            }
+
+            if (filteredPosts.length > 0) {
+                activeId = filteredPosts[0].id.toString();
+                // Sync address bar link with top search result match
+                const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?id=' + activeId;
+                window.history.pushState({path:newurl}, '', newurl);
+            }
+            
+            renderPage();
+        }
+
+        document.getElementById('search-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                executeSearch();
+            }
+        });
+
+        async function renderPage() {
+            if (filteredPosts.length === 0) {
+                document.getElementById('empty-state').style.display = 'block';
+                document.getElementById('main-content-wrapper').style.display = 'none';
+                
+                if (document.getElementById('search-input').value.trim() !== "") {
+                    document.getElementById('empty-title').innerText = "No Search Results Found!";
+                    document.getElementById('empty-desc').innerText = "Try searching for a different keyword.";
+                } else {
+                    document.getElementById('empty-title').innerText = "No Blogs Posted Yet!";
+                    document.getElementById('empty-desc').innerText = "The database is completely clear.";
+                }
+                return;
+            }
+
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('main-content-wrapper').style.display = 'grid';
+
+            let currentPost = filteredPosts.find(p => p.id.toString() === activeId.toString()) || filteredPosts[0];
+            activeId = currentPost.id.toString(); // Safety sync fallback
+            
+            if (!sessionStorage.getItem(`viewed-${currentPost.id}`)) {
+                currentPost.views += 1;
+                sessionStorage.setItem(`viewed-${currentPost.id}`, 'true');
+                await _supabase.from('posts').update({ views: currentPost.views }).eq('id', currentPost.id);
+            }
+
+            const mainImg = document.getElementById('active-image');
+            if (currentPost.image) {
+                mainImg.src = currentPost.image;
+                mainImg.style.display = 'block';
+            } else {
+                mainImg.style.display = 'none';
+            }
+
+            document.getElementById('active-title').innerText = currentPost.title;
+            document.getElementById('active-meta').innerText = `Added: ${currentPost.date} | Views: ${currentPost.views}`;
+            document.getElementById('active-body').innerText = currentPost.content;
+            
+            let starString = '';
+            for(let i=0; i<5; i++) {
+                starString += i < currentPost.stars ? '★' : '☆';
+            }
+            document.getElementById('active-stars').innerText = starString;
+
+            const sidebar = document.getElementById('sidebar-list');
+            sidebar.innerHTML = '';
+            filteredPosts.forEach(post => {
+                let sideStars = '★'.repeat(post.stars);
+                const item = document.createElement('div');
+                item.style.cssText = "display: flex; margin-bottom: 10px; border-bottom: 1px solid #EEE; padding-bottom: 5px;";
+                
+                let imageElement = `
+                    <div style="width: 60px; height: 45px; background-color: #DDD; border: 1px solid #999; margin-right: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; font-weight: bold; text-align: center;">
+                        BLOG
+                    </div>`;
+                if (post.image) {
+                    imageElement = `<img src="${escapeHTML(post.image)}" class="thumb-img" onerror="this.style.display='none'">`;
+                }
+
+                item.innerHTML = `
+                    ${imageElement}
+                    <div>
+                        <a href="#" onclick="changeActivePost('${post.id}'); return false;" style="font-weight: ${post.id.toString() === currentPost.id.toString() ? 'bold' : 'normal'}; font-size: 12px; display: block;">${escapeHTML(post.title)}</a>
+                        <span style="font-size: 11px; color: #666;">Views: ${post.views}</span><br>
+                        <span class="stars" style="font-size:11px;">${sideStars}</span>
+                    </div>
+                `;
+                sidebar.appendChild(item);
+            });
+        }
+
+        // FIXED: Updates browser link location map dynamically so pages slide seamlessly
+        window.changeActivePost = function(id) {
+            activeId = id.toString();
+            
+            const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?id=' + id;
+            window.history.pushState({path:newurl}, '', newurl);
+            
+            renderPage();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Listens to browser back/forward buttons to properly track navigation updates
+        window.addEventListener('popstate', function() {
+            initActiveId();
+            renderPage();
+        });
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+        }
+
+        fetchPosts();
+    </script>
+</body>
+</html>
