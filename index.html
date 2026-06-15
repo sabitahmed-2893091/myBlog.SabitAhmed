@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>myBlog - Broadcast Your Thoughts</title>
+    <title>myBlog </title>
+    
+    <link rel="icon" type="image/png" href="logo.png">
+
     <style>
         body {
             background-color: #FFFFFF;
@@ -109,7 +112,6 @@
             color: #FFCC00;
             font-size: 14px;
         }
-        /* FIXED: Thumbnail styling configuration */
         .thumb-img {
             width: 60px;
             height: 45px;
@@ -254,7 +256,6 @@
                 await _supabase.from('posts').update({ views: currentPost.views }).eq('id', currentPost.id);
             }
 
-            // Display main image if it exists
             const mainImg = document.getElementById('active-image');
             if (currentPost.image) {
                 mainImg.src = currentPost.image;
@@ -280,7 +281,6 @@
                 const item = document.createElement('div');
                 item.style.cssText = "display: flex; margin-bottom: 10px; border-bottom: 1px solid #EEE; padding-bottom: 5px;";
                 
-                // FIXED: Renders image thumbnail link component dynamically if available in Supabase row
                 let imageElement = `
                     <div style="width: 60px; height: 45px; background-color: #DDD; border: 1px solid #999; margin-right: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; font-weight: bold; text-align: center;">
                         BLOG
@@ -299,11 +299,6 @@
                 `;
                 sidebar.appendChild(item);
             });
-        }
-
-        window.changeActivePost = function(id) {
-            activeId = id;
-            renderPage();
         }
 
         function escapeHTML(str) {
