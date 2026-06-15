@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <meta charset="UTF-8">
-    <title>myBlog</title>
-    
-    <link rel="icon" type="image/png" href="logo.png">
+    <meta charset="UTF-8">
+    <title>myBlog - Broadcast Your Thoughts</title>
     <style>
         body {
             background-color: #FFFFFF;
@@ -111,6 +109,14 @@
             color: #FFCC00;
             font-size: 14px;
         }
+        /* FIXED: Thumbnail styling configuration */
+        .thumb-img {
+            width: 60px;
+            height: 45px;
+            object-fit: cover;
+            border: 1px solid #999;
+            margin-right: 8px;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -123,7 +129,7 @@
                 <button class="button-retro" onclick="executeSearch()">Search</button>
             </div>
             <div>
-                <button class="button-retro" onclick="checkAdminAccess()" style="background-color: #FFF9CC; border-color: #E6DB55;">Admin</button>
+                <button class="button-retro" onclick="checkAdminAccess()" style="background-color: #FFF9CC; border-color: #E6DB55;">Admin CP</button>
             </div>
         </div>
 
@@ -135,12 +141,17 @@
                         <span>From: Admin</span>
                     </div>
                     <div class="box-content">
-                        <div class="post-title" id="active-title"></div>
-                        <div class="post-meta" id="active-meta"></div>
-                        <div class="post-body" id="active-body"></div>
-                        <div>
-                            <span style="font-weight:bold;">Rating:</span> 
-                            <span class="stars" id="active-stars"></span>
+                        <div style="display: flex; gap: 15px; flex-direction: column;">
+                            <img id="active-image" style="width: 100%; max-height: 250px; object-fit: cover; border: 1px solid #DDD; display: none; margin-bottom: 10px;">
+                            <div>
+                                <div class="post-title" id="active-title"></div>
+                                <div class="post-meta" id="active-meta"></div>
+                                <div class="post-body" id="active-body"></div>
+                                <div>
+                                    <span style="font-weight:bold;">Rating:</span> 
+                                    <span class="stars" id="active-stars"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -167,7 +178,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let blogPosts = [];
-        let filteredPosts = []; // For holding our filtered search data matrix
+        let filteredPosts = [];
         const urlParams = new URLSearchParams(window.location.search);
         let activeId = urlParams.get('id'); 
 
@@ -184,7 +195,7 @@
             let { data, error } = await _supabase.from('posts').select('*').order('id', { ascending: false });
             if (error) console.error(error);
             blogPosts = data || [];
-            filteredPosts = blogPosts; // Default state shows everything
+            filteredPosts = blogPosts;
             
             if (!activeId && filteredPosts.length > 0) {
                 activeId = filteredPosts[0].id.toString();
@@ -192,12 +203,11 @@
             renderPage();
         }
 
-        // FIXED: Live database search routing mechanism
         function executeSearch() {
             const query = document.getElementById('search-input').value.toLowerCase().trim();
             
             if (query === "") {
-                filteredPosts = blogPosts; // Reset back to full list if empty query
+                filteredPosts = blogPosts;
             } else {
                 filteredPosts = blogPosts.filter(post => 
                     post.title.toLowerCase().includes(query) || 
@@ -205,7 +215,6 @@
                 );
             }
 
-            // Adjust the reading view fallback to match the matching search results list
             if (filteredPosts.length > 0) {
                 activeId = filteredPosts[0].id.toString();
             }
@@ -213,7 +222,6 @@
             renderPage();
         }
 
-        // Allow pressing 'Enter' inside search bar to trigger search instantly
         document.getElementById('search-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 executeSearch();
@@ -225,7 +233,6 @@
                 document.getElementById('empty-state').style.display = 'block';
                 document.getElementById('main-content-wrapper').style.display = 'none';
                 
-                // Show custom messaging if search query came up dry
                 if (document.getElementById('search-input').value.trim() !== "") {
                     document.getElementById('empty-title').innerText = "No Search Results Found!";
                     document.getElementById('empty-desc').innerText = "Try searching for a different keyword.";
@@ -247,6 +254,15 @@
                 await _supabase.from('posts').update({ views: currentPost.views }).eq('id', currentPost.id);
             }
 
+            // Display main image if it exists
+            const mainImg = document.getElementById('active-image');
+            if (currentPost.image) {
+                mainImg.src = currentPost.image;
+                mainImg.style.display = 'block';
+            } else {
+                mainImg.style.display = 'none';
+            }
+
             document.getElementById('active-title').innerText = currentPost.title;
             document.getElementById('active-meta').innerText = `Added: ${currentPost.date} | Views: ${currentPost.views}`;
             document.getElementById('active-body').innerText = currentPost.content;
@@ -263,10 +279,18 @@
                 let sideStars = '★'.repeat(post.stars);
                 const item = document.createElement('div');
                 item.style.cssText = "display: flex; margin-bottom: 10px; border-bottom: 1px solid #EEE; padding-bottom: 5px;";
-                item.innerHTML = `
+                
+                // FIXED: Renders image thumbnail link component dynamically if available in Supabase row
+                let imageElement = `
                     <div style="width: 60px; height: 45px; background-color: #DDD; border: 1px solid #999; margin-right: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; font-weight: bold; text-align: center;">
                         BLOG
-                    </div>
+                    </div>`;
+                if (post.image) {
+                    imageElement = `<img src="${escapeHTML(post.image)}" class="thumb-img" onerror="this.style.display='none'">`;
+                }
+
+                item.innerHTML = `
+                    ${imageElement}
                     <div>
                         <a href="#" onclick="changeActivePost('${post.id}'); return false;" style="font-weight: ${post.id.toString() === currentPost.id.toString() ? 'bold' : 'normal'}; font-size: 12px; display: block;">${escapeHTML(post.title)}</a>
                         <span style="font-size: 11px; color: #666;">Views: ${post.views}</span><br>
@@ -277,7 +301,6 @@
             });
         }
 
-        // Seamless local switching logic that doesn't clear searches when changing entries
         window.changeActivePost = function(id) {
             activeId = id;
             renderPage();
